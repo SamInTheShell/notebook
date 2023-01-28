@@ -35,4 +35,4 @@ spec:
   upgrade:
     remediation:
       remediateLastFailure: true
-  values: {}
+  values:
