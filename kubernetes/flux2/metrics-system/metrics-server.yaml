@@ -36,5 +36,10 @@ spec:
     remediation:
       remediateLastFailure: true
   values:
+    # this is necessary for some CNI's like calico and cilium
+    # hostNetwork:
+    #   enabled: true
+
+    # necessary when cluster CA is not setup correctly, typically in dev
     args:
-      - --kubelet-insecure-tls
+    - --kubelet-insecure-tls
