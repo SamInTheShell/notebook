@@ -12,7 +12,7 @@ metadata:
   name: minio
 spec:
   interval: 5m
-  url: https://charts.min.io/
+  url: https://operator.min.io
 
 ---
 apiVersion: helm.toolkit.fluxcd.io/v2beta1
@@ -26,7 +26,7 @@ spec:
       chart: operator
       sourceRef:
         kind: HelmRepository
-        name: operator
+        name: minio
       ## Find the latest version with this command
       ## curl -s https://operator.min.io/index.yaml | yq '.entries.operator[0]'
       version: 4.5.8
