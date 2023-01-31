@@ -1,0 +1,146 @@
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: minio1
+
+---
+apiVersion: source.toolkit.fluxcd.io/v1beta2
+kind: HelmRepository
+metadata:
+  namespace: minio1
+  name: minio
+spec:
+  interval: 5m
+  url: https://operator.min.io
+
+---
+apiVersion: helm.toolkit.fluxcd.io/v2beta1
+kind: HelmRelease
+metadata:
+  namespace: minio1
+  name: tenant
+spec:
+  chart:
+    spec:
+      chart: tenant
+      sourceRef:
+        kind: HelmRepository
+        name: minio
+      ## Find the latest version with this command
+      ## curl -s https://operator.min.io/index.yaml | yq '.entries.tenant[0]'
+      version: 4.5.8
+  dependsOn:
+  - name: operator
+    namespace: minio-operator
+  interval: 5m
+  releaseName: tenant
+  targetNamespace: minio1
+  upgrade:
+    remediation:
+      remediateLastFailure: true
+  ## Secret with credentials are required for the chart to install.
+  ## Either use external-secrets or this command to populate admin creds.
+  ##     kubectl --namespace minio1 create secret generic minio-admin --from-literal=username=admin --from-literal=password=$(openssl rand -hex 10)
+  ## Password can be recovered.
+  ##     kubectl -nminio1 get secrets minio-admin -oyaml | yq '.data.password|@base64d'
+  valuesFrom:
+  - kind: Secret
+    name: minio-admin
+    valuesKey: username
+    targetPath: secrets.accessKey
+
+  - kind: Secret
+    name: minio-admin
+    valuesKey: password
+    targetPath: secrets.secretKey
+
+  values:
+    ## Ref: https://github.com/minio/operator/blob/master/helm/tenant/values.yaml
+    secrets: {}
+    tenant:
+      name: minio1
+      image:
+        repository: quay.io/minio/minio
+        tag: RELEASE.2023-01-12T02-06-16Z
+        pullPolicy: IfNotPresent
+
+      ## List of bucket names to create during tenant provisioning
+      buckets:
+      - name: internal
+      - name: external
+
+      ## List of secret names to use for generating MinIO users during tenant provisioning
+      users:
+      - name: someuserhere
+
+      pools:
+      - servers: 4
+        name: pool-0
+        volumesPerServer: 1
+        size: 10Gi
+        resources: {}
+        labels: {}
+        tolerations: []
+        nodeSelector: {}
+        topologySpreadConstraints: []
+        affinity:
+          podAntiAffinity:
+            requiredDuringSchedulingIgnoredDuringExecution:
+            - labelSelector:
+                matchExpressions:
+                - key: v1.min.io/pool
+                  operator: In
+                  values:
+                  - pool-0
+              topologyKey: kubernetes.io/hostname
+      ## Uncommenting below is how storage expansion is done
+      # - servers: 4
+      #   name: pool-1
+      #   volumesPerServer: 2
+      #   size: 10Gi
+      #   resources: {}
+      #   labels: {}
+      #   tolerations: []
+      #   nodeSelector: {}
+      #   affinity:
+      #     podAntiAffinity:
+      #       requiredDuringSchedulingIgnoredDuringExecution:
+      #       - labelSelector:
+      #           matchExpressions:
+      #           - key: v1.min.io/pool
+      #             operator: In
+      #             values:
+      #             - pool-1
+      #         topologyKey: kubernetes.io/hostname
+      
+      metrics:
+        enabled: false
+        port: 9000
+        protocol: http
+
+      prometheus:
+        disabled: false
+      log:
+        disabled: true
+
+    ingress:
+      api:
+        enabled: false
+        ingressClassName: ""
+        labels: { }
+        annotations: { }
+        tls: [ ]
+        host: minio.local
+        path: /
+        pathType: Prefix
+      console:
+        enabled: false
+        ingressClassName: ""
+        labels: { }
+        annotations: { }
+        tls: [ ]
+        host: minio-console.local
+        path: /
+        pathType: Prefix
+
