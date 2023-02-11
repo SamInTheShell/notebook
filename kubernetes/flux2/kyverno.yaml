@@ -31,7 +31,6 @@ spec:
   dependsOn: []
   interval: 5m
   releaseName: kyverno
-  targetNamespace: kyverno
   upgrade:
     remediation:
       remediateLastFailure: true

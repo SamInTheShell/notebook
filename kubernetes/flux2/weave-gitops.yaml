@@ -30,25 +30,46 @@ spec:
   upgrade:
     remediation:
       remediateLastFailure: true
+
+
+  ## If you're using Dex, do the steps for that HelmRelease first.
+  ##
+  ## For all other OICD providers, create a secret with this command.
+  ##     kubectl --namespace flux-system create secret generic oicd-connector-secret --from-literal=clientID=c51522b8bf1d54e82bc5163e22416004 --from-literal=clientSecret=14d243782ec196ca4b950f5094933676de73eaee7282431e728aea1afab9a66d
+  ##
+  valuesFrom:
+  - kind: Secret
+    name: oicd-connector-secret
+    valuesKey: clientID
+    targetPath: oidcSecret.clientID
+
+  - kind: Secret
+    name: oicd-connector-secret
+    valuesKey: clientSecret
+    targetPath: oidcSecret.clientSecret
+
   values:
     ## Reference Values:
     ##   helm show values oci://ghcr.io/weaveworks/charts/weave-gitops
+
+    logLevel: info # debug
 
     ## Should the 'oidc-auth' secret be created. For a detailed
     ## explanation of these attributes please see our documentation:
     ## https://docs.gitops.weave.works/docs/configuration/securing-access-to-the-dashboard/#login-via-an-oidc-provider
     oidcSecret:
-      create: false
-      # clientID:
-      # clientSecret:
-      # issuerURL:
-      # redirectURL:
+      create: true
+      ## These are passed from pre-generated secret values.
+      # clientID: 
+      # clientSecret: 
+      issuerURL: http://dex.auth-system.svc.cluster.local:5556
+      redirectURL: http://weave-gitops.flux-system.svc.cluster.local:9001/oauth2/callback
 
 
     ## Create an admin user
     adminUser:
-      create: false
-      # username: admin
+      create: true
+      username: admin
 
       ## Generate a random password.
       ##   htpasswd -bnBC 10 "" $(openssl rand -hex 30 | tee /dev/stderr) | cut -c2- | tr -d '\n' | pbcopy
@@ -57,9 +78,15 @@ spec:
       ##   htpasswd -nBC 10 "" | cut -c2- |  tr -d '\n' | pbcopy
       ##
       ## The password set here is: admin
-      # passwordHash: $2y$10$b7PDB.B7P2uQpsKvlMys1e/DMXJ6Mc/cd8j4uh1Th8EOeccPxpwX.
+      passwordHash: $2y$10$b7PDB.B7P2uQpsKvlMys1e/DMXJ6Mc/cd8j4uh1Th8EOeccPxpwX.
 
+    ## this passes an an arg to disable auth-secret above
+    additionalArgs:
+    # - --oidc-username-claim=email
+    # - --auth-methods=oidc
 
     rbac:
       ## Ensure admin user can impersonate resources
-      # impersonationResourceNames: [ "admin" ]
+      #impersonationResourceNames: [ "admin" ]
+      #impersonationResourceNames: ["stematiclabs:dex-user"]
+      impersonationResources: ["users","groups"]

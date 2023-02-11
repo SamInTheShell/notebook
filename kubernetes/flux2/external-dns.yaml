@@ -31,7 +31,6 @@ spec:
   dependsOn: []
   interval: 5m
   releaseName: external-dns
-  targetNamespace: external-dns
   upgrade:
     remediation:
       remediateLastFailure: true

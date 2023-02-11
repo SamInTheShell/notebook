@@ -37,7 +37,6 @@ spec:
   dependsOn: []
   interval: 5m
   releaseName: operator
-  targetNamespace: minio-operator
   upgrade:
     remediation:
       remediateLastFailure: true

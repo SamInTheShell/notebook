@@ -31,7 +31,6 @@ spec:
   dependsOn: []
   interval: 5m
   releaseName: minio
-  targetNamespace: minio
   upgrade:
     remediation:
       remediateLastFailure: true

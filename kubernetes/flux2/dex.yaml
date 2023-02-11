@@ -2,13 +2,13 @@
 apiVersion: v1
 kind: Namespace
 metadata:
-  name: dex
+  name: auth-system
 
 ---
 apiVersion: source.toolkit.fluxcd.io/v1beta2
 kind: HelmRepository
 metadata:
-  namespace: dex
+  namespace: auth-system
   name: dexipd
 spec:
   interval: 5m
@@ -18,7 +18,7 @@ spec:
 apiVersion: helm.toolkit.fluxcd.io/v2beta1
 kind: HelmRelease
 metadata:
-  namespace: dex
+  namespace: auth-system
   name: dex
 spec:
   chart:
@@ -31,8 +31,140 @@ spec:
   dependsOn: []
   interval: 5m
   releaseName: dex
-  targetNamespace: dex
   upgrade:
     remediation:
       remediateLastFailure: true
+
+  ## Generate new secrets.
+  ##    OICDCLIENTID=$(openssl rand -hex 16) OICDCLIENTSECRET=$(openssl rand -hex 32)
+  ##    kubectl --namespace flux-system create secret generic oicd-connector-secret --from-literal=clientID=${OICDCLIENTID} --from-literal=clientSecret=${OICDCLIENTSECRET}
+  ##    kubectl --namespace auth-system create secret generic dex-static-oicd-secret \
+  ##        --from-literal=clientID=${OICDCLIENTID} --from-literal=clientSecret=${OICDCLIENTSECRET} \
+  ##        --from-literal=redirectURI_1=http://weave-gitops.flux-system.svc.cluster.local:9001/oauth2/callback \
+  ##        --from-literal=name="Weave GitOps"
+  ##
+  ## Add a new OAuth App for your organization:
+  ##     https://github.com/organizations/<ORG-HERE>/settings/applications
+  ##
+  ## Store the client and secret id:
+  ##     kubectl --namespace auth-system create secret generic oicd-connector-secret --from-literal=clientID=<Client-ID> --from-literal=clientSecret=<Client-Secret>
+  ##
+  ## HelmReleases don't merge slices[0], so using environment variables is
+  ## necessary. However keeping this here ensures the HelmrRemease doesn't run
+  ## the chart without the dependency being met.
+  valuesFrom:
+  - kind: Secret
+    name: oicd-connector-secret
+    valuesKey: clientID
+    targetPath: zzImpossibleToMergeSoPlaceholdForDepLock[0]
+
+  - kind: Secret
+    name: oicd-connector-secret
+    valuesKey: clientSecret
+    targetPath: zzImpossibleToMergeSoPlaceholdForDepLock[1]
+    
+  ## Static secrets that things in the cluster share with Dex for validation.
+  - kind: Secret
+    name: dex-static-oicd-secret
+    valuesKey: redirectURI_1
+    targetPath: config.staticClients[0].redirectURIs[0]
+
+  - kind: Secret
+    name: dex-static-oicd-secret
+    valuesKey: clientID
+    targetPath: config.staticClients[0].id
+
+  - kind: Secret
+    name: dex-static-oicd-secret
+    valuesKey: clientSecret
+    targetPath: config.staticClients[0].secret
+
+  - kind: Secret
+    name: dex-static-oicd-secret
+    valuesKey: name
+    targetPath: config.staticClients[0].name
+
+
   values:
+    https:
+      enabled: false
+
+    grpc:
+      enabled: false
+
+    ## Put the 
+    ## n the config shown below.
+    envVars:
+      - name: OICD_CONNECTOR_SECRET_CLIENTID
+        valueFrom:
+          secretKeyRef:
+            name: oicd-connector-secret
+            key: clientID
+
+      - name: OICD_CONNECTOR_SECRET_CLIENTSECRET
+        valueFrom:
+          secretKeyRef:
+            name: oicd-connector-secret
+            key: clientSecret
+
+    ## Dex Application Config :: Documentation: https://dexidp.io/docs/
+    config:
+      logger:
+        level: info # debug will spew sensitive data
+        format: text # can be json
+
+      ## Issuer should be where clients connect
+      issuer: http://dex.auth-system.svc.cluster.local:5556
+
+      ## See https://dexidp.io/docs/storage/ for more options
+      storage:
+        type: kubernetes
+        config:
+          inCluster: true
+
+      connectors:
+        - type: github
+          id: dex-auth
+          name: Dex Auth
+          config:
+            ## These are pre-populated secret values. Dex was kind enough to
+            ## support reading environment variables for these two config values
+            ## so we don't have to put the entire `connecctors` map in a secret.
+            clientID: $OICD_CONNECTOR_SECRET_CLIENTID
+            clientSecret: $OICD_CONNECTOR_SECRET_CLIENTSECRET
+            redirectURI: http://dex.auth-system.svc.cluster.local:5556/callback
+            orgs:
+            - name: stematiclabs
+              teams:
+              - dex-user
+            
+            loadAllGroups: false
+            teamNameField: slug
+            useLoginAsID: false
+
+      ## Used by apps to connect to dex
+      ## This is pregenerated and all stored as keys in secrets. Simply setting
+      ## the staticClients key will result in everything being overwritten as {}
+      ## because flux v2 is too dumb to deep merge values. Big sad.
+      # staticClients:
+      # - name: Weave GitOps
+      #   redirectURIs:
+      #   - http://weave-gitops.flux-system.svc.cluster.local:9001/oauth2/callback
+      #   id: $DEX_STATIC_OICD_SECRET_CLIENTID
+      #   secret: $DEX_STATIC_OICD_SECRET_CLIENTSECRET
+
+    ## Static users 
+    staticPasswords:
+    - email: "admin@noreply.com"
+      # bcrypt hash of the string "password": $(echo password | htpasswd -BinC 10 admin | cut -d: -f2)
+      ## Generate a random password.
+      ##   htpasswd -bnBC 10 "" $(openssl rand -hex 30 | tee /dev/stderr) | cut -c2- | tr -d '\n' | pbcopy
+      ##
+      ## Choose your own password.
+      ##   htpasswd -nBC 10 "" | cut -c2- |  tr -d '\n' | pbcopy
+      ##
+      ## The password set here is: admin
+      hash: $2y$10$b7PDB.B7P2uQpsKvlMys1e/DMXJ6Mc/cd8j4uh1Th8EOeccPxpwX.
+      username: admin
+      ## Random uuid can be generated with: uuidgen
+      userID: 44BCA4CD-DE35-46B3-A8B6-6D145219B1B6

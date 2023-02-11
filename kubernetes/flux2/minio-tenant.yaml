@@ -35,7 +35,6 @@ spec:
     namespace: minio-operator
   interval: 5m
   releaseName: tenant
-  targetNamespace: minio1
   upgrade:
     remediation:
       remediateLastFailure: true
