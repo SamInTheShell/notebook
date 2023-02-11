@@ -34,10 +34,22 @@ spec:
     ## Reference Values:
     ##   helm show values oci://ghcr.io/weaveworks/charts/weave-gitops
 
+    ## Should the 'oidc-auth' secret be created. For a detailed
+    ## explanation of these attributes please see our documentation:
+    ## https://docs.gitops.weave.works/docs/configuration/securing-access-to-the-dashboard/#login-via-an-oidc-provider
+    oidcSecret:
+      create: false
+      # clientID:
+      # clientSecret:
+      # issuerURL:
+      # redirectURL:
+
+
     ## Create an admin user
     adminUser:
-      create: true
-      username: admin
+      create: false
+      # username: admin
+
       ## Generate a random password.
       ##   htpasswd -bnBC 10 "" $(openssl rand -hex 30 | tee /dev/stderr) | cut -c2- | tr -d '\n' | pbcopy
       ##
@@ -45,9 +57,9 @@ spec:
       ##   htpasswd -nBC 10 "" | cut -c2- |  tr -d '\n' | pbcopy
       ##
       ## The password set here is: admin
-      passwordHash: $2y$10$b7PDB.B7P2uQpsKvlMys1e/DMXJ6Mc/cd8j4uh1Th8EOeccPxpwX.
+      # passwordHash: $2y$10$b7PDB.B7P2uQpsKvlMys1e/DMXJ6Mc/cd8j4uh1Th8EOeccPxpwX.
 
 
     rbac:
       ## Ensure admin user can impersonate resources
-      impersonationResourceNames: [ "admin" ]
+      # impersonationResourceNames: [ "admin" ]
