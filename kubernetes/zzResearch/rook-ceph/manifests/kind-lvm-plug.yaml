@@ -1,0 +1,94 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  namespace: kube-system
+  name: kind-lvm-plug
+data:
+  run-nbd.sh: |
+    apt update && DEBIAN_FRONTEND=noninteractive apt install -y qemu-utils lvm2
+    IMG_PATH="/data/images/developer.qcow2"
+
+    qemu-img create -f qcow2 "${IMG_PATH}" 20G
+
+    NBD_ID=$(grep -l '^0$' /sys/class/block/nbd*/size | grep -oE '[0-9]+' | sort -n | head -n1)
+    DEV_PATH="/dev/nbd${NBD_ID}"
+
+    echo "DEV_PATH=${DEV_PATH}" > /container.env
+
+    qemu-nbd --connect "${DEV_PATH}" "${IMG_PATH}" --cache=directsync --pid-file /run/nbd.pid
+    echo "Running qemu-nbd on ${DEV_PATH}"
+    NBD_PID=$(cat /run/nbd.pid)
+
+    pvcreate "${DEV_PATH}"
+    if vgs myvolumegroup; then
+      vgextend myvolumegroup "${DEV_PATH}"
+    else
+      vgcreate myvolumegroup "${DEV_PATH}"
+    fi
+
+    while [ -d "/proc/${NBD_PID}" ]; do sleep 5; done
+    echo "Failed to find /proc/${NBD_PID}"
+    exit 1
+
+  readiness-check.sh: |
+    source /container.env
+    [ -f /run/nbd.pid ] || exit 1
+---
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  namespace: kube-system
+  name: kind-lvm-plug
+spec:
+  selector:
+    matchLabels:
+      name: kind-lvm-plug
+  template:
+    metadata:
+      labels:
+        name: kind-lvm-plug
+    spec:
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+            - matchExpressions:
+              - key: settings.cluster.local/lvm-storage-pool
+                operator: In
+                values:
+                  - enabled
+      containers:
+      - name: qemu-nbd-lvm
+        image: debian:11
+        command: ['bash', '/opt/lvm-plug/bin/run-nbd.sh']
+        readinessProbe:
+          exec:
+            command: ['bash', '/opt/lvm-plug/bin/readiness-check.sh']
+          initialDelaySeconds: 5
+          periodSeconds: 5
+        imagePullPolicy: IfNotPresent
+        name: qemu-nbd
+        resources: {}
+        securityContext:
+          allowPrivilegeEscalation: true
+          privileged: true
+        volumeMounts:
+        - name: lvm-plug
+          mountPath: "/opt/lvm-plug/bin"
+          readOnly: true
+        - name: device-dir
+          mountPath: /dev
+        - name: data-img-dir
+          mountPath: /data/images
+      volumes:
+      - name: lvm-plug
+        configMap:
+          name: kind-lvm-plug
+      - name: device-dir
+        hostPath:
+          path: /dev
+          type: Directory
+      - name: data-img-dir
+        hostPath:
+          path: /data/images
+          type: DirectoryOrCreate
