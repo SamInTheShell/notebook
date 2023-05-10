@@ -62,89 +62,114 @@ spec:
               values:
               - enabled
   storage:
+    # references:
+    # - https://github.com/rook/rook/blob/739efd29bada1a73e987b6bc7a60958e92b02b14/deploy/examples/cluster.yaml#L246
+    # - https://rook.io/docs/rook/v1.11/CRDs/Cluster/ceph-cluster-crd/#osd-configuration-settings
+    config:
+      # crushRoot: "custom-root" # specify a non-default root label for the CRUSH map
+      # metadataDevice: "md0" # specify a non-rotational storage so ceph-volume will use it as block db device of bluestore.
+      # databaseSizeMB: "1024" # uncomment if the disks are smaller than 100 GB
+      # osdsPerDevice: "1" # this value can be overridden at the node or device level
+      # encryptedDevice: "true" # the default value for this option is "false"
+    # Individual nodes and their config can be specified as well, but 'useAllNodes' above must be set to false. Then, only the named
+    # nodes below will be used as storage resources.  Each node's 'name' field should match their 'kubernetes.io/hostname' label.
+    # nodes:
+    #   - name: "172.17.4.201"
+    #     devices: # specific devices to use for storage can be specified for each node
+    #       - name: "sdb"
+    #       - name: "nvme01" # multiple osds can be created on high performance devices
+    #         config:
+    #           osdsPerDevice: "5"
+    #       - name: "/dev/disk/by-id/ata-ST4000DM004-XXXX" # devices can be specified using full udev paths
+    #     config: # configuration can be specified at the node level which overrides the cluster level config
+    #   - name: "172.17.4.301"
+    #     deviceFilter: "^sd."
     storageClassDeviceSets:
-      - name: set1
-        # The number of OSDs to create from this device set
-        count: 3
-        # IMPORTANT: If volumes specified by the storageClassName are not portable across nodes
-        # this needs to be set to false. For example, if using the local storage provisioner
-        # this should be false.
-        portable: true
-        # Certain storage class in the Cloud are slow
-        # Rook can configure the OSD running on PVC to accommodate that by tuning some of the Ceph internal
-        # Currently, "gp2" has been identified as such
-        tuneDeviceClass: true
-        # Certain storage class in the Cloud are fast
-        # Rook can configure the OSD running on PVC to accommodate that by tuning some of the Ceph internal
-        # Currently, "managed-premium" has been identified as such
-        tuneFastDeviceClass: false
-        # whether to encrypt the deviceSet or not
-        encrypted: false
-        # Since the OSDs could end up on any node, an effort needs to be made to spread the OSDs
-        # across nodes as much as possible. Unfortunately the pod anti-affinity breaks down
-        # as soon as you have more than one OSD per node. The topology spread constraints will
-        # give us an even spread on K8s 1.18 or newer.
-        placement:
-          topologySpreadConstraints:
-          - maxSkew: 1
-            topologyKey: kubernetes.io/hostname
-            whenUnsatisfiable: ScheduleAnyway
-            labelSelector:
-              matchExpressions:
-              - key: app
-                operator: In
-                values:
-                - rook-ceph-osd
-        preparePlacement:
-          podAntiAffinity:
-            preferredDuringSchedulingIgnoredDuringExecution:
-            - weight: 100
-              podAffinityTerm:
-                labelSelector:
-                  matchExpressions:
-                  - key: app
-                    operator: In
-                    values:
-                    - rook-ceph-osd
-                  - key: app
-                    operator: In
-                    values:
-                    - rook-ceph-osd-prepare
-                topologyKey: kubernetes.io/hostname
-          topologySpreadConstraints:
-          - maxSkew: 1
-            # NOTE: If topology.kubernetes.io/zone is available, this is where it would go
-            topologyKey: kubernetes.io/hostname
-            whenUnsatisfiable: DoNotSchedule
-            labelSelector:
-              matchExpressions:
-              - key: app
-                operator: In
-                values:
-                - rook-ceph-osd-prepare
-        resources:
-        # These are the OSD daemon limits. For OSD prepare limits, see the separate section below for "prepareosd" resources
-        #   limits:
-        #     cpu: "500m"
-        #     memory: "4Gi"
-        #   requests:
-        #     cpu: "500m"
-        #     memory: "4Gi"
-        volumeClaimTemplates:
-        - metadata:
-            name: data
-            # if you are looking at giving your OSD a different CRUSH device class than the one detected by Ceph
-            # annotations:
-            #   crushDeviceClass: hybrid
-          spec:
-            resources:
-              requests:
-                storage: 10Gi
-            # IMPORTANT: Change the storage class depending on your environment
-            storageClassName: lvm-myvolumegroup
-            volumeMode: Block
-            accessModes:
-            - ReadWriteOnce
+    - name: set1
+      config:
+        osdsPerDevice: "2" # this value can be overridden at the node or device level
+      # The number of OSDs to create from this device set
+      count: 3
+      # IMPORTANT: If volumes specified by the storageClassName are not portable across nodes
+      # this needs to be set to false. For example, if using the local storage provisioner
+      # this should be false.
+      portable: false
+      # Certain storage class in the Cloud are slow
+      # Rook can configure the OSD running on PVC to accommodate that by tuning some of the Ceph internal
+      # Currently, "gp2" has been identified as such
+      tuneDeviceClass: true
+      # Certain storage class in the Cloud are fast
+      # Rook can configure the OSD running on PVC to accommodate that by tuning some of the Ceph internal
+      # Currently, "managed-premium" has been identified as such
+      tuneFastDeviceClass: false
+      # whether to encrypt the deviceSet or not
+      encrypted: false
+      # Since the OSDs could end up on any node, an effort needs to be made to spread the OSDs
+      # across nodes as much as possible. Unfortunately the pod anti-affinity breaks down
+      # as soon as you have more than one OSD per node. The topology spread constraints will
+      # give us an even spread on K8s 1.18 or newer.
+      placement:
+        topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector:
+            matchExpressions:
+            - key: app
+              operator: In
+              values:
+              - rook-ceph-osd
+      preparePlacement:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            podAffinityTerm:
+              labelSelector:
+                matchExpressions:
+                - key: app
+                  operator: In
+                  values:
+                  - rook-ceph-osd
+                - key: app
+                  operator: In
+                  values:
+                  - rook-ceph-osd-prepare
+              topologyKey: kubernetes.io/hostname
+        topologySpreadConstraints:
+        - maxSkew: 1
+          # NOTE: If topology.kubernetes.io/zone is available, this is where it would go
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: DoNotSchedule
+          labelSelector:
+            matchExpressions:
+            - key: app
+              operator: In
+              values:
+              - rook-ceph-osd-prepare
+      resources:
+      # These are the OSD daemon limits. For OSD prepare limits, see the separate section below for "prepareosd" resources
+      #   limits:
+      #     cpu: "500m"
+      #     memory: "4Gi"
+      #   requests:
+      #     cpu: "500m"
+      #     memory: "4Gi"
+      volumeClaimTemplates:
+      - metadata:
+          name: data
+          # if you are looking at giving your OSD a different CRUSH device class than the one detected by Ceph
+          # annotations:
+          #   crushDeviceClass: hybrid
+        spec:
+          resources:
+            requests:
+              storage: 10Gi
+          # IMPORTANT: Change the storage class depending on your environment
+          # LV-backed PVC flaw: https://rook.io/docs/rook/v1.11/Troubleshooting/ceph-common-issues/#lvm-metadata-can-be-corrupted-with-osd-on-lv-backed-pvc
+          storageClassName: lvm-myvolumegroup
+          volumeMode: Block
+          accessModes:
+          - ReadWriteOnce
       # dedicated block device to store bluestore database (block.db)
       # - metadata:
       #     name: metadata

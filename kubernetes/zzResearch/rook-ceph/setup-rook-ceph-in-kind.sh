@@ -1,5 +1,7 @@
 #!/bin/bash
 
+set -e
+
 if [ "$(uname)" != "Darwin" ]; then
     echo "This script was designed for Docker Desktop on Mac OS."
     echo "Running it on Linux could be dangerous due to working with host level block devices."
