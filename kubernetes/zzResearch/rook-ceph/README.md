@@ -46,6 +46,7 @@ done
 ```
 
 ## Further Reading
+- Ceph Architecture (Video): https://www.youtube.com/watch?v=PmLPbrf-x9g
 - Setting up consumable storage: https://rook.io/docs/rook/v1.11/Getting-Started/example-configurations/#setting-up-consumable-storage
 - Filesystem Storage: https://rook.io/docs/rook/v1.11/CRDs/Shared-Filesystem/ceph-filesystem-crd/
 - CephFilesystems across namespaces: https://github.com/rook/rook/blob/master/Documentation/Storage-Configuration/Shared-Filesystem-CephFS/filesystem-storage.md#consume-the-shared-filesystem-across-namespaces
