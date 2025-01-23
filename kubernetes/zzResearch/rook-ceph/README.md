@@ -1,6 +1,7 @@
 # Rook Ceph
 This script prepares a KinD cluster with some network block storage to test a rook-ceph cluster with OpenEBS lvm-localpv.
 ```
+kind delete cluster
 bash kubernetes/zzResearch/rook-ceph/setup-rook-ceph-in-kind.sh
 ```
 
