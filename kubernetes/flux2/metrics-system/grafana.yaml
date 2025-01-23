@@ -36,7 +36,7 @@ spec:
       remediateLastFailure: true
   values:
     datasources:
-    datasources.yaml:
+    datasources.yaml: |
       apiVersion: 1
         datasources:
           - access: proxy
